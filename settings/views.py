@@ -26,9 +26,13 @@ def index(request):
             user_settings.currency = currency
             user_settings.save()
         else:
-            Setting.objects.create(user=request.user, currency=currency)
-            user_settings['currency'] = currency
-            return render(request, 'settings/index.html', context={'currencies': arr, 'settings': user_settings})
+            try:
+
+                Setting.objects.create(user=request.user, currency=currency)
+                user_settings['currency'] = currency
+                return render(request, 'settings/index.html', context={'currencies': arr, 'settings': user_settings})
+            except Exception as obj:
+                pass
         messages.success(request, 'Changes saved successfully')
 
         return render(request, 'settings/index.html', context={'currencies': arr, 'settings': user_settings})
