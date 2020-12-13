@@ -8,8 +8,6 @@ from django.conf import settings
 
 
 def index(request):
-    user_settings = Setting.objects.filter(user=request.user)[
-        0] if Setting.objects.filter(user=request.user).exists() else None
     data = []
     file = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     file_path = os.path.join(settings.BASE_DIR, 'currencies.json')
@@ -18,24 +16,20 @@ def index(request):
         arr = []
         for key, value in data.items():
             arr.append({'name': key, 'value': value})
-    if request.method == 'GET':
-        return render(request, 'settings/index.html', context={'currencies': arr, 'settings': user_settings})
-    else:
+
+    user_obj, created = Setting.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
         currency = request.POST['currency']
-        if user_settings is not None:
-            user_settings.currency = currency
-            user_settings.save()
-        else:
-            try:
+        if not request.POST['currency']:
+            messages.error(request, 'ERROR')
+            return render(request, 'settings/index.html', context={'currencies': arr, 'settings': user_obj})
 
-                Setting.objects.create(user=request.user, currency=currency)
-                user_settings['currency'] = currency
-                return render(request, 'settings/index.html', context={'currencies': arr, 'settings': user_settings})
-            except Exception as obj:
-                pass
-        messages.success(request, 'Changes saved successfully')
+        Setting.objects.filter(user=request.user).update(currency=currency)
 
-        return render(request, 'settings/index.html', context={'currencies': arr, 'settings': user_settings})
+    messages.success(request, 'Changes saved successfully')
+
+    return render(request, 'settings/index.html', context={'currencies': arr, 'settings': user_obj})
 
 
 def account(request):

@@ -1,4 +1,7 @@
+import csv
+import xlwt
 from django.shortcuts import render, redirect
+from django.views import View
 from .models import Expense, Category
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -10,6 +13,11 @@ import calendar
 import json
 import os
 from settings.models import Setting
+from django.db.models import Sum
+from io import BytesIO
+from xhtml2pdf import pisa
+from django.template.loader import get_template
+from django.http import HttpResponse
 
 
 def index(request):
@@ -270,6 +278,7 @@ def last_3months_stats(request):
     for x in expenses:
         for y in categories:
             final[y] = get_expense_count(y)
+    print(final)
     return JsonResponse({'category_data': final}, safe=False)
 
 
@@ -349,3 +358,87 @@ def last_3months_expense_source_stats(request):
 
     keyed_data.append({str(last_3_month): prev_month_data})
     return JsonResponse({'cumulative_income_data': keyed_data}, safe=False)
+
+
+def export_csv(request):
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename=Expenses'+str(datetime.datetime.now())+'.csv'
+
+    writer = csv.writer(response)
+    writer.writerow(['Amount', 'Category', 'Date'])
+
+    expenses = Expense.objects.filter(owner=request.user)
+
+    for expense in expenses:
+        writer.writerow([expense.amount, expense.category, expense.date])
+
+    return response
+
+
+def export_excel(request):
+    response = HttpResponse(content_type='application/ms-excel')
+    response['Content-Disposition'] = 'attachment; filename=Expenses'+str(datetime.datetime.now())+'.xls'
+
+    wb = xlwt.Workbook(encoding='utf-8')
+    ws = wb.add_sheet('Expenses')
+    row_num = 0
+    font_style = xlwt.XFStyle()
+    font_style.font.bold = True
+
+    colums = ['Amount', 'Category', 'Date']
+
+    for col_num in range(len(colums)):
+        ws.write(row_num, col_num, colums[col_num], font_style)
+
+    font_style = xlwt.XFStyle()
+
+    rows = Expense.objects.filter(owner=request.user).values_list('amount', 'category', 'date')
+
+    for row in rows:
+        row_num += 1
+
+        for col_num in range(len(row)):
+            ws.write(row_num, col_num, str(row[col_num]), font_style)
+
+    wb.save(response)
+    return response
+
+
+def render_to_pdf(template_src, context):
+    template = get_template(template_src)
+    html = template.render(context)
+    result = BytesIO()
+
+    pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+    if not pdf.err:
+        return HttpResponse(result.getvalue(), content_type='application/pdf')
+    else:
+        return HttpResponse("Error Rendering PDF", status=400)
+
+
+class single_inc_pdf_download(View):
+    def get(self, request, *args, **kwargs):
+        expenses = Expense.objects.filter(owner=request.user)
+        sum = expenses.aggregate(Sum('amount'))
+
+        context = {
+            'expenses': expenses,
+            'pagesize': 'A4',
+            'total': sum['amount__sum'],
+
+        }
+        # html = template.render(context)
+        pdf = render_to_pdf('expenses/pdf-output.html', context)
+        if pdf:
+            response = HttpResponse(pdf, content_type='application/pdf')
+
+            filename = 'Expenses' + str(datetime.datetime.now()) + '.pdf'
+            content = "inline; filename=%s" % filename
+            download = request.GET.get('download')
+            if download:
+                content = "attachment; filename=%s" % filename
+            response['Content-Disposition'] = content
+            return response
+        return HttpResponse("Not found")
+

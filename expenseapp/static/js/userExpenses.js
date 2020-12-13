@@ -76,3 +76,4 @@ field.addEventListener("keyup", function (e) {
 });
 
 searchBtn.addEventListener("click", searchItems);
+

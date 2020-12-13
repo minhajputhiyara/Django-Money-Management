@@ -34,6 +34,22 @@
 </div>
 
 {% else %}
+    <div class="row">
+        <div class="col-lg-4 col-md-4">
+            <a href="{% url 'export-excel' %}" class="btn btn-primary"> Download Excel</a>
+        </div>
+        <div class="col-md-4">
+            <a href="{% url 'export-csv' %}" class="btn btn-warning"> Download CSV</a>
+        </div>
+        <div class="col-md-4">
+            <form method="GET" action="{% url 'export-pdf' %}">
+                <input name="download"
+                       class="btn btn-info btn-very-small"
+                       type="submit"
+                       value="Download PDF">
+            </form>
+        </div>
+    </div>
  <form class="form-inline my-2 my-lg-0 float-right p-2">
       <input class="form-control mr-sm-2" type="search" placeholder="Search"  id="search" aria-label="Search">
       <button class="btn btn-outline-success my-2 my-sm-0 search-btn" type="submit">Search</button>

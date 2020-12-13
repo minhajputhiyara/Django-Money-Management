@@ -34,6 +34,22 @@
 </div>
 
 {% else %}
+    <div class="row">
+        <div class="col-md-4">
+            <a href="{% url 'i-export-excel' %}" class="btn btn-primary"> Download Excel</a>
+        </div>
+        <div class="col-md-4">
+            <a href="{% url 'i-export-csv' %}" class="btn btn-warning"> Download CSV</a>
+        </div>
+        <div class="col-md-4">
+            <form method="GET" action="{% url 'i-export-pdf' %}">
+                <input name="download"
+                       class="btn btn-info btn-very-small"
+                       type="submit"
+                       value="Download PDF">
+            </form>
+        </div>
+    </div>
  <form class="form-inline my-2 my-lg-0 float-right p-2">
       <input class="form-control mr-sm-2" type="search" placeholder="Search"  id="search" aria-label="Search">
       <button class="btn btn-outline-success my-2 my-sm-0 search-btn" type="submit">Search</button>
@@ -66,15 +82,15 @@
     </tr>
   </thead>
   <tbody>
-{% for ex in page_obj%}
+{% for i in page_obj%}
 
      <tr class="text-sm-left small">
-      <td>{{ex.amount}}</td>
-       <td>{{ex.source }}</td>
-      <td>{{ex.description}}</td>
-      <td>{{ex.date|date:'d/m/Y' }}</td>
+      <td>{{i.amount}}</td>
+       <td>{{i.source }}</td>
+      <td>{{i.description}}</td>
+      <td>{{i.income_date|date:'d/m/Y' }}</td>
 <td>
- <a type="button" class="btn btn-outline-success btn-sm"  href={%  url 'income_edit' ex.id %}>Edit</a>
+ <a type="button" class="btn btn-outline-success btn-sm"  href={%  url 'income_edit' i.id %}>Edit</a>
  <button type="button" class="btn btn-outline-danger btn-sm" data-toggle="modal" data-target="#exampleModal">X</button>
 
  <div class="modal" tabindex="-1" role="dialog" id="exampleModal">
@@ -91,7 +107,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-danger" data-dismiss="modal">CLOSE</button>
-        <a type="button" class="btn btn-primary"  href={%  url 'income_delete' ex.id %}>YES</a>
+        <a type="button" class="btn btn-primary"  href={%  url 'income_delete' i.id %}>YES</a>
       </div>
     </div>
   </div>

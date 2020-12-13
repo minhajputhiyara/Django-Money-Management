@@ -17,4 +17,8 @@ urlpatterns = [
     path('last_3months_income_source_stats', views.last_3months_income_source_stats,
          name='last_3months_income_source_stats_'),
 
+    path('income/export_csv', views.export_csv, name="i-export-csv"),
+    path('income/export_excel', views.export_excel, name="i-export-excel"),
+    path('income/export_pdf', views.single_inc_pdf_download.as_view(), name="i-export-pdf"),
+
 ]

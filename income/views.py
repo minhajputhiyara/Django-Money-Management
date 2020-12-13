@@ -1,4 +1,9 @@
+import csv
+
+import xlwt
 from django.shortcuts import render, redirect
+from django.views import View
+
 from .models import Income, Source
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -10,6 +15,11 @@ import calendar
 import json
 import os
 from settings.models import Setting
+from django.db.models import Sum
+from io import BytesIO
+from xhtml2pdf import pisa
+from django.template.loader import get_template
+from django.http import HttpResponse
 
 
 def index(request):
@@ -22,7 +32,7 @@ def search_income(request):
     search_val = json.loads(data).get('data')
     income = Income.objects.filter(description__icontains=search_val, owner=request.user) | Income.objects.filter(
         amount__startswith=search_val, owner=request.user) | Income.objects.filter(
-        date__icontains=search_val, owner=request.user) | Income.objects.filter(
+        income_date__icontains=search_val, owner=request.user) | Income.objects.filter(
         source__icontains=search_val, owner=request.user)
     data = list(income.values())
     return JsonResponse(data, safe=False)
@@ -62,7 +72,7 @@ def income_add(request):
     amount = request.POST['amount']
     description = request.POST['description']
 
-    date = request.POST['in_date']
+    income_date = request.POST['in_date']
     source = request.POST['source']
 
     if not amount:
@@ -72,12 +82,12 @@ def income_add(request):
         messages.error(request,  'Income Source is required')
         return render(request=request, template_name='income/new.html', context=context)
 
-    if not date:
+    if not income_date:
         messages.error(request,  'Date is required')
         return render(request=request, template_name='income/new.html', context=context)
 
     income = Income.objects.create(
-        amount=amount, description=description, source=source, date=date, owner=request.user)
+        amount=amount, description=description, source=source, income_date=income_date, owner=request.user)
 
     if income:
         messages.success(request,  'Income was submitted successfully')
@@ -100,8 +110,6 @@ def income_edit(request, id):
     amount = request.POST['amount']
     description = request.POST['description']
     source = request.POST['source']
-    name = request.POST['description']
-    date = request.POST['in_date']
     if not source:
         messages.error(request,  'source is required')
         return render(request, 'income/edit.html', context)
@@ -109,10 +117,8 @@ def income_edit(request, id):
         messages.error(request,  'Amount is required')
         return render(request, 'income/edit.html', context)
     income.amount = amount
-    income.description = name
     income.description = description
     income.source = source
-    income.date = date
     income.save()
     messages.success(request,  'Income updated successfully')
     return redirect('income')
@@ -149,19 +155,19 @@ def income_summary(request):
     this_year_count = 0
 
     for one in all_income:
-        if one.date == today:
+        if one.income_date == today:
             todays_amount += one.amount
             todays_count += 1
 
-        if one.date >= week_ago:
+        if one.income_date >= week_ago:
             this_week_amount += one.amount
             this_week_count += 1
 
-        if one.date >= month_ago:
+        if one.income_date >= month_ago:
             this_month_amount += one.amount
             this_month_count += 1
 
-        if one.date >= year_ago:
+        if one.income_date >= year_ago:
             this_year_amount += one.amount
             this_year_count += 1
 
@@ -202,7 +208,7 @@ def income_summary_rest(request):
     def get_amount_for_month(month):
         month_amount = 0
         for one in all_income:
-            month_, year = one.date.month, one.date.year
+            month_, year = one.income_date.month, one.income_date.year
             if month == month_ and year == today_year:
                 month_amount += one.amount
         return month_amount
@@ -215,8 +221,8 @@ def income_summary_rest(request):
     def get_amount_for_day(x, today_day, month, today_year):
         day_amount = 0
         for one in all_income:
-            day_, date_,  month_, year_ = one.date.isoweekday(
-            ), one.date.day, one.date.month, one.date.year
+            day_, date_,  month_, year_ = one.income_date.isoweekday(
+            ), one.income_date.day, one.income_date.month, one.income_date.year
             if x == day_ and month == month_ and year_ == today_year:
                 if not day_ > today_day:
                     day_amount += one.amount
@@ -254,7 +260,7 @@ def last_3months_income_stats(request):
     todays_date = datetime.date.today()
     three_months_ago = datetime.date.today() - datetime.timedelta(days=90)
     income = Income.objects.filter(owner=request.user,
-                                   date__gte=three_months_ago, date__lte=todays_date)
+                                   income_date__gte=three_months_ago, income_date__lte=todays_date)
     # sources occuring.
 
     def get_sources(item):
@@ -273,6 +279,7 @@ def last_3months_income_stats(request):
     for x in income:
         for y in sources:
             final[y] = get_sources_count(y)
+    print(final)
     return JsonResponse({'sources_data': final}, safe=False)
 
 
@@ -283,11 +290,12 @@ def last_3months_income_source_stats(request):
     last_3_month = last_2_month - datetime.timedelta(days=30)
 
     last_month_income = Income.objects.filter(owner=request.user,
-                                              date__gte=last_month, date__lte=todays_date).order_by('date')
+                                              income_date__gte=last_month, income_date__lte=todays_date).order_by(
+        'income_date')
     prev_month_income = Income.objects.filter(owner=request.user,
-                                              date__gte=last_month, date__lte=last_2_month)
+                                              income_date__gte=last_month, income_date__lte=last_2_month)
     prev_prev_month_income = Income.objects.filter(owner=request.user,
-                                                   date__gte=last_2_month, date__lte=last_3_month)
+                                                   income_date__gte=last_2_month, income_date__lte=last_3_month)
 
     keyed_data = []
     this_month_data = {'7th': 0, '15th': 0, '22nd': 0, '29th': 0}
@@ -295,8 +303,8 @@ def last_3months_income_source_stats(request):
     prev_prev_month_data = {'7th': 0, '15th': 0, '22nd': 0, '29th': 0}
 
     for x in last_month_income:
-        month = str(x.date)[:7]
-        date_in_month = str(x.date)[:2]
+        month = str(x.income_date)[:7]
+        date_in_month = str(x.income_date)[:2]
         if int(date_in_month) <= 7:
             this_month_data['7th'] += x.amount
         if int(date_in_month) > 7 and int(date_in_month) <= 15:
@@ -336,3 +344,86 @@ def last_3months_income_source_stats(request):
 
     keyed_data.append({str(last_3_month): prev_month_data})
     return JsonResponse({'cumulative_income_data': keyed_data}, safe=False)
+
+
+def export_csv(request):
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename=Expenses'+str(datetime.datetime.now())+'.csv'
+
+    writer = csv.writer(response)
+    writer.writerow(['Amount', 'Category', 'Date'])
+
+    incomes = Income.objects.filter(owner=request.user)
+
+    for income in incomes:
+        writer.writerow([income.amount, income.source, str(income.income_date)])
+
+    return response
+
+
+def export_excel(request):
+    response = HttpResponse(content_type='application/ms-excel')
+    response['Content-Disposition'] = 'attachment; filename=Expenses'+str(datetime.datetime.now())+'.xls'
+
+    wb = xlwt.Workbook(encoding='utf-8')
+    ws = wb.add_sheet('Income')
+    row_num = 0
+    font_style = xlwt.XFStyle()
+    font_style.font.bold = True
+
+    colums = ['Amount', 'Category', 'Date']
+
+    for col_num in range(len(colums)):
+        ws.write(row_num, col_num, colums[col_num], font_style)
+
+    font_style = xlwt.XFStyle()
+
+    rows = Income.objects.filter(owner=request.user).values_list('amount', 'category', 'income_date')
+
+    for row in rows:
+        row_num += 1
+
+        for col_num in range(len(row)):
+            ws.write(row_num, col_num, str(row[col_num]), font_style)
+
+    wb.save(response)
+    return response
+
+
+def render_to_pdf(template_src, context):
+    template = get_template(template_src)
+    html = template.render(context)
+    result = BytesIO()
+
+    pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
+    if not pdf.err:
+        return HttpResponse(result.getvalue(), content_type='application/pdf')
+    else:
+        return HttpResponse("Error Rendering PDF", status=400)
+
+
+class single_inc_pdf_download(View):
+    def get(self, request, *args, **kwargs):
+        incomes = Income.objects.filter(owner=request.user)
+        sum = incomes.aggregate(Sum('amount'))
+
+        context = {
+            'expenses': incomes,
+            'pagesize': 'A4',
+            'total': sum['amount__sum'],
+
+        }
+        # html = template.render(context)
+        pdf = render_to_pdf('income/pdf-output.html', context)
+        if pdf:
+            response = HttpResponse(pdf, content_type='application/pdf')
+
+            filename = 'Income' + str(datetime.datetime.now()) + '.pdf'
+            content = "inline; filename=%s" % filename
+            download = request.GET.get('download')
+            if download:
+                content = "attachment; filename=%s" % filename
+            response['Content-Disposition'] = content
+            return response
+        return HttpResponse("Not found")
