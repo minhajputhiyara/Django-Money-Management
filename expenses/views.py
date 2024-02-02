@@ -77,7 +77,7 @@ def expenses_add(request):
     }
     amount = request.POST['amount']
     name = request.POST['name']
-    category = request.POST['category']
+    category = request.POST.get('category', 'default_category')
     date = request.POST['ex_date']
     if not amount:
         messages.error(request,  'Amount is required')

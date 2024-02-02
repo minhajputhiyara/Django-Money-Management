@@ -42,7 +42,7 @@
                   <label for="source">Source</label>
                   <select name="source" class="form-control" id="source">
           {% for source in  sources%}
-           <option name="source">{{source.name}}</option>
+           <option value="{{source.name}}">{{source.name}}</option>
           {% endfor %}
                   </select>
            </div>

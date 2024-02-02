@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib import messages, auth
 from django.contrib.auth.models import User
 from django.template.loader import render_to_string
-from django.utils.encoding import force_bytes, force_text, DjangoUnicodeDecodeError
+from django.utils.encoding import force_bytes, force_str, DjangoUnicodeDecodeError
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 import threading
 from .utils import account_activation_token

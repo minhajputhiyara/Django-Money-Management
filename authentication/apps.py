@@ -5,4 +5,4 @@ class authenticationConfig(AppConfig):
     name = 'authentication'
 
     def ready(self):
-        import profile.signals
+        import profile
